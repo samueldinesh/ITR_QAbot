@@ -1,0 +1,14 @@
+langchain
+langchain-community
+langchain-openai
+streamlit
+fastapi
+uvicorn
+faiss-cpu  # If using FAISS
+pinecone-client  # If using Pinecone for vector storage
+requests
+pydantic
+tiktoken
+bs4
+python-dotenv
+pypdf
