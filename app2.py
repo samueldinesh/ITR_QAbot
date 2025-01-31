@@ -82,6 +82,8 @@ prompt_template = ChatPromptTemplate.from_template(
     Name: {name}
     Salary: ₹{salary}
     tax_comparison: {tax_comparison}
+    Deductions: {deductions}
+    Investments: {investments}
 
     Previous Chat History:
     {chat_history}
@@ -96,7 +98,6 @@ prompt_template = ChatPromptTemplate.from_template(
     - If needed, explain how deductions are applied.
     """
 )
-
 class CalculateTax:
     @staticmethod
     def old_regime(salary):
@@ -148,22 +149,43 @@ class CalculateTax:
 
         return tax, tax_breakdown
 
+
+
+
+# Define User Profile Schema
+class UserProfile(BaseModel):
+    user_id: str
+    name: str
+    salary: float
+    deductions: List[str] = []
+    investments: List[str] = []
+
 # Define Chat Message Schema
 class ChatMessage(BaseModel):
     user_id: str
-    user_name: str
-    user_salary: float
+    #user_name: str
+    #salary: float
     message: str
+
+# **API Endpoint: Save User Profile**
+@app.post("/save_user")
+async def save_user_profile(profile: UserProfile):
+    user_profiles[profile.user_id] = profile.dict()
+    return {"message": "User profile saved successfully", "profile": profile}
 
 @app.post("/chat")
 async def chat_with_bot(chat: ChatMessage):
     user_id = chat.user_id
-    user_name = chat.user_name
-    salary = chat.user_salary
+    #user_name = chat.user_name
+    #salary = chat.salary
     user_message = chat.message
+    #print("user_id:", user_id, "user_name:", user_name, "salary:", salary, "user_message:", user_message)
+    if user_id not in user_profiles:
+        return {"response": "Please set up your tax profile first!"}
 
-    #if user_id not in user_profiles:
-    #    return {"response": "Please set up your tax profile first!"}
+    # Retrieve user profile
+    user_info = user_profiles[user_id]
+    salary = user_info["salary"]
 
     # Calculate taxes (Old Regime - No deductions, New Regime - No deductions)
     old_tax, old_breakdown = CalculateTax.old_regime(salary)
@@ -208,9 +230,11 @@ async def chat_with_bot(chat: ChatMessage):
     # Generate AI response
     prompt = prompt_template.format(
         context=context,
-        name=user_name,
+        name=user_info["name"],
         salary=salary,
         tax_comparison=tax_comparison,
+        deductions=", ".join(user_info["deductions"]),
+        investments=", ".join(user_info["investments"]),
         chat_history=chat_history,
         question=user_message
     )
@@ -220,8 +244,8 @@ async def chat_with_bot(chat: ChatMessage):
     # Store conversation in memory
     memory.save_context({"input": user_message}, {"output": response.content})
 
-    #return {"response": f"{tax_comparison}\n\n{response.content}"}
-    return {"response": f"{response.content}"}
+    return {"response": f"{tax_comparison}\n\n{response.content}"}
+
 
 # **API Endpoint: Clear Memory for a User**
 @app.post("/clear_memory")

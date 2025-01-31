@@ -3,6 +3,7 @@ import requests
 import json
 import os
 
+
 API_BASE_URL = "http://127.0.0.1:8000"
 DATA_FILE = "data/users.json"  # File to store session data
 
@@ -11,7 +12,6 @@ st.title("ITR Advisor Bot")
 
 # **Function to Save Data to JSON**
 def save_data():
-    os.makedirs(os.path.dirname(DATA_FILE), exist_ok=True)  # Ensure directory exists
     with open(DATA_FILE, "w") as file:
         json.dump(st.session_state["users"], file)
 
@@ -24,7 +24,7 @@ def load_data():
 
 # **Initialize Session Storage**
 if "users" not in st.session_state:
-    st.session_state["users"] = load_data()
+    st.session_state["users"] = load_data() #{}
 if "selected_user" not in st.session_state:
     st.session_state["selected_user"] = None
 if "chat_history" not in st.session_state:
@@ -54,7 +54,17 @@ if selected_user == "New User" or st.session_state["edit_mode"]:
     user_name = st.sidebar.text_input("Enter Your Name:", value=st.session_state["users"].get(user_id, {}).get("name", "") if selected_user != "New User" else "")
     salary = st.sidebar.number_input("Enter Your Annual Salary (₹):", min_value=0.0, step=10000.0, format="%.2f", 
                                      value=st.session_state["users"].get(user_id, {}).get("salary", 0.0) if selected_user != "New User" else 0.0)
-    
+    deduction_choices = st.sidebar.multiselect("Select Your Tax Deductions", 
+                                               ["PPF", "EPF", "NPS", "LIC Premium", "ELSS", "Home Loan Principal", "Tuition Fees"],
+                                               default=st.session_state["users"].get(user_id, {}).get("deductions", []) if selected_user != "New User" else [])
+    manual_deductions = st.sidebar.number_input("Enter Additional Deductions (₹):", min_value=0.0, step=1000.0, format="%.2f", 
+                                                value=st.session_state["users"].get(user_id, {}).get("manual_deductions", 0.0) if selected_user != "New User" else 0.0)
+    investment_choices = st.sidebar.multiselect("Select Your Investments", 
+                                                ["Fixed Deposits", "Stocks", "Mutual Funds", "Real Estate", "Gold", "Cryptocurrency"],
+                                                default=st.session_state["users"].get(user_id, {}).get("investments", []) if selected_user != "New User" else [])
+    manual_investments = st.sidebar.number_input("Enter Additional Investments (₹):", min_value=0.0, step=1000.0, format="%.2f", 
+                                                 value=st.session_state["users"].get(user_id, {}).get("manual_investments", 0.0) if selected_user != "New User" else 0.0)
+
     # **Save or Update Profile**
     if st.sidebar.button("Save Profile"):
         if user_id and user_name:
@@ -62,13 +72,17 @@ if selected_user == "New User" or st.session_state["edit_mode"]:
                 "user_id": user_id,
                 "name": user_name,
                 "salary": salary,
+                "deductions": deduction_choices,
+                "manual_deductions": manual_deductions,
+                "investments": investment_choices,
+                "manual_investments": manual_investments
             }
             
             # Store locally in session
             st.session_state["users"][user_id] = profile_data
             st.session_state["selected_user"] = user_id
             st.session_state["edit_mode"] = False  # **Ensure Edit Mode is Turned Off**
-            
+
             # Send to FastAPI
             response = requests.post(f"{API_BASE_URL}/save_user", json=profile_data)
             if response.status_code == 200:
@@ -86,41 +100,34 @@ else:
     st.sidebar.markdown(f"""
     **👤 Name:** {user_data['name']}  
     **💰 Salary:** ₹{user_data['salary']:,}  
+    **📉 Deductions:** {", ".join(user_data['deductions'])}  
+    **➕ Additional Deductions:** ₹{user_data['manual_deductions']:,}  
+    **📈 Investments:** {", ".join(user_data['investments'])}  
+    **➕ Additional Investments:** ₹{user_data['manual_investments']:,}  
     """)
 
     if st.sidebar.button("Edit Profile"):
         st.session_state["edit_mode"] = True  # **Enable edit mode when clicked**
-        st.rerun()
-
+        st.rerun() 
 # **Chat Section**
 st.subheader("💬 Chat with AI Tax Advisor")
 
-if st.session_state["selected_user"] and st.session_state["selected_user"] != "New User":
+if st.session_state["selected_user"]:
     user_message = st.text_input("Ask a tax-related question:")
-    col1, col2,col3 = st.columns([1,1,6])
-    with col1:
-        if st.button("Send"):
-            with st.spinner("Thinking..."):
-                chat_data = {
-                    "user_id": st.session_state["selected_user"],
-                    "user_name": st.session_state["users"][st.session_state["selected_user"]]["name"],
-                    "user_salary": st.session_state["users"][st.session_state["selected_user"]]["salary"],
-                    "message": user_message
-                }
-                print(chat_data)
-                response = requests.post(f"{API_BASE_URL}/chat", json=chat_data)
 
-                if response.status_code == 200:
-                    reply = response.json()["response"]
-                    st.session_state["chat_history"].insert(0, ("You", user_message))  # Insert new message at top
-                    st.session_state["chat_history"].insert(0, ("AI", reply))  # Insert AI response at top  
-    with col2:
-        if st.button("Clear Chat"):
-            response = requests.post(f"{API_BASE_URL}/clear_chat")
+    if st.button("Send"):
+        with st.spinner("Thinking..."):
+            chat_data = {
+                "user_id": st.session_state["selected_user"],
+                "message": user_message
+            }
+            print(chat_data)
+            response = requests.post(f"{API_BASE_URL}/chat", json=chat_data)
+
             if response.status_code == 200:
                 reply = response.json()["response"]
-                print(reply)
-            
+                st.session_state["chat_history"].insert(0, ("You", user_message))  # Insert new message at top
+                st.session_state["chat_history"].insert(0, ("AI", reply))  # Insert AI response at top
 
 # **Display Chat History (Latest Messages on Top)**
 st.subheader("🗨 Chat History")
