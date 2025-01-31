@@ -1,14 +1,30 @@
 import streamlit as st
 import requests
+import json
+import os
+
 
 API_BASE_URL = "http://127.0.0.1:8000"
+DATA_FILE = "data/users.json"  # File to store session data
 
 st.set_page_config(page_title="ITR Advisor Bot", layout="wide")
 st.title("ITR Advisor Bot")
 
-# **🔹 Initialize Session Storage**
+# **Function to Save Data to JSON**
+def save_data():
+    with open(DATA_FILE, "w") as file:
+        json.dump(st.session_state["users"], file)
+
+# **Function to Load Data from JSON**
+def load_data():
+    if os.path.exists(DATA_FILE):
+        with open(DATA_FILE, "r") as file:
+            return json.load(file)
+    return {}
+
+# **Initialize Session Storage**
 if "users" not in st.session_state:
-    st.session_state["users"] = {}
+    st.session_state["users"] = load_data() #{}
 if "selected_user" not in st.session_state:
     st.session_state["selected_user"] = None
 if "chat_history" not in st.session_state:
@@ -16,7 +32,7 @@ if "chat_history" not in st.session_state:
 if "edit_mode" not in st.session_state:
     st.session_state["edit_mode"] = False  # Tracks if user is editing profile
 
-# **🔹 Sidebar: Manage Users & Profile Editing**
+# **Sidebar: Manage Users & Profile Editing**
 st.sidebar.header("Manage Users")
 
 # **Load or Switch Users**
@@ -71,6 +87,8 @@ if selected_user == "New User" or st.session_state["edit_mode"]:
             response = requests.post(f"{API_BASE_URL}/save_user", json=profile_data)
             if response.status_code == 200:
                 st.sidebar.success(f"✅ Profile saved for {user_name}!")
+                save_data()  # Save to JSON
+                st.rerun()  # **Force UI refresh to show consolidated profile view**
             else:
                 st.sidebar.error("❌ Error saving profile.")
         else:
@@ -90,8 +108,8 @@ else:
 
     if st.sidebar.button("Edit Profile"):
         st.session_state["edit_mode"] = True  # **Enable edit mode when clicked**
-
-# **🔹 Chat Section**
+        st.rerun() 
+# **Chat Section**
 st.subheader("💬 Chat with AI Tax Advisor")
 
 if st.session_state["selected_user"]:
@@ -103,6 +121,7 @@ if st.session_state["selected_user"]:
                 "user_id": st.session_state["selected_user"],
                 "message": user_message
             }
+            print(chat_data)
             response = requests.post(f"{API_BASE_URL}/chat", json=chat_data)
 
             if response.status_code == 200:
@@ -110,7 +129,7 @@ if st.session_state["selected_user"]:
                 st.session_state["chat_history"].insert(0, ("You", user_message))  # Insert new message at top
                 st.session_state["chat_history"].insert(0, ("AI", reply))  # Insert AI response at top
 
-# **🔹 Display Chat History (Latest Messages on Top)**
+# **Display Chat History (Latest Messages on Top)**
 st.subheader("🗨 Chat History")
 for sender, msg in st.session_state["chat_history"]:
     with st.chat_message(sender):

@@ -13,3 +13,4 @@ venv/
 #app
 *.faiss
 *.pkl
+data/users.json

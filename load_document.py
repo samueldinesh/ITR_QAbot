@@ -59,7 +59,7 @@ query = "What is Section 80C of the Income Tax Act?"
 print(f"\nQuery: {query}")
 
 # Retrieve relevant documents
-retrieved_docs = retriever.get_relevant_documents(query)
+retrieved_docs = retriever.invoke(query)
 
 if retrieved_docs:
     print("\nRetrieved relevant sections from the Income Tax Act.\n")
